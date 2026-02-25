@@ -53,7 +53,10 @@
                 "USE_GYRO_FFT_FILTER",
                 "USE_BARO_DPS310",
                 "USE_ADAPTIVE_FILTER",
-                "MCU_FLASH_SIZE 1024"
+                "MCU_FLASH_SIZE 1024",
+                "USE_IMU_ICM42605",
+                "USE_IMU_ICM45686",
+                "USE_BOOTLOG=2048"
             ],
             "configurationProvider": "ms-vscode.cmake-tools"
         }
