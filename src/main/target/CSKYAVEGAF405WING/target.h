@@ -20,8 +20,6 @@
 #define TARGET_BOARD_IDENTIFIER "CA4W"
 #define USBD_PRODUCT_STRING  "CSKY AVEGA F405 WING"
 
-#define USE_BOOTLOG 2048
-
 // LEDs
 #define LED0                    PA14  //Blue
 #define LED1                    PA13  //Green
@@ -98,10 +96,9 @@
 /*
  * Sensor drivers
  */
-
 //ICM-45686
 #define USE_IMU_ICM45686
-#define IMU_ICM45686_ALIGN      CW270_DEG
+#define IMU_ICM45686_ALIGN      CW180_DEG
 #define ICM45686_CS_PIN         PA4
 #define ICM45686_SPI_BUS        BUS_SPI1
 

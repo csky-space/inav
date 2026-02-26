@@ -370,24 +370,45 @@ static void icm45686AccAndGyroInit(gyroDev_t *gyro)
     gyro->sampleRateIntervalUs = 1000000 / config->gyroRateHz;
         
     busSetSpeed(dev, BUS_SPEED_INITIALIZATION);
-	
+
     // enable sensors
     busWrite(dev, ICM456XX_PWR_MGMT0, (ICM456XX_GYRO_MODE_LN | ICM456XX_ACCEL_MODE_LN));
-    delay(ICM456XX_SENSOR_ENABLE_DELAY_MS); // Allow sensors to power on and stabilize
-    
+    // Allow sensors to power on and stabilize
+    delay(ICM456XX_SENSOR_ENABLE_DELAY_MS);
+    // Configure accelerometer full-scale range (16g mode)
     busWrite(dev, ICM456XX_ACCEL_CONFIG0, ICM456XX_ACCEL_FS_SEL_16G | ICM456XX_ACCEL_ODR_1K6_LN);
+    // Per datasheet Table 9-6: 10ms minimum startup time
     delay(ICM456XX_ACCEL_STARTUP_TIME_MS);
-
-    icm45686WriteIREG(dev, ICM456XX_GYRO_SRC_CTRL_IREG_ADDR, ICM456XX_SRC_CTRL_AAF_ENABLE_BIT | ICM456XX_SRC_CTRL_INTERP_ENABLE_BIT);
-    icm45686WriteIREG(dev, ICM456XX_GYRO_UI_LPF_CFG_IREG_ADDR, ICM456XX_GYRO_UI_LPFBW_ODR_DIV_8);
-    busWrite(dev, ICM456XX_GYRO_CONFIG0, ICM456XX_GYRO_FS_SEL_2000DPS | ICM456XX_GYRO_ODR_6K4_LN);
-    delay(ICM456XX_GYRO_STARTUP_TIME_MS); // Per datasheet Table 9-6: 35ms minimum startup time
+    // gyro filters
+    // Enable Anti-Alias (AAF) Filter and Interpolator for Gyro (Section 7.2 of datasheet)
+    if (!icm45686WriteIREG(dev, ICM456XX_GYRO_SRC_CTRL_IREG_ADDR, ICM456XX_SRC_CTRL_AAF_ENABLE_BIT | ICM456XX_SRC_CTRL_INTERP_ENABLE_BIT)) {
+        // AAF/Interpolator initialization failed, fallback to disabled state
+        icm45686WriteIREG(dev, ICM456XX_GYRO_SRC_CTRL_IREG_ADDR, 0);
+    }
+    // Set the Gyro UI LPF bandwidth cut-off (Section 7.3 of datasheet)
+    if (!icm45686WriteIREG(dev, ICM456XX_GYRO_UI_LPF_CFG_IREG_ADDR, config->gyroConfigValues[0])) {
+        // If LPF configuration fails, fallback to BYPASS
+        icm45686WriteIREG(dev, ICM456XX_GYRO_UI_LPF_CFG_IREG_ADDR, ICM456XX_GYRO_UI_LPFBW_BYPASS);
+    }
+    // accel filters
+    // Enable Anti-Alias Filter and Interpolator for Accel (Section 7.2 of datasheet)
+    if (!icm45686WriteIREG(dev, ICM456XX_ACCEL_SRC_CTRL_IREG_ADDR, ICM456XX_SRC_CTRL_AAF_ENABLE_BIT | ICM456XX_SRC_CTRL_INTERP_ENABLE_BIT)) {
+        icm45686WriteIREG(dev, ICM456XX_ACCEL_SRC_CTRL_IREG_ADDR, 0);
+    }
+    // Set the Accel UI LPF bandwidth cut-off to ODR/8 (Section 7.3 of datasheet)
+    if (!icm45686WriteIREG(dev, ICM456XX_ACCEL_UI_LPF_CFG_IREG_ADDR, ICM456XX_ACCEL_UI_LPFBW_ODR_DIV_8)) {
+        // If LPF configuration fails, fallback to BYPASS
+        icm45686WriteIREG(dev, ICM456XX_ACCEL_UI_LPF_CFG_IREG_ADDR, ICM456XX_ACCEL_UI_LPFBW_ODR_DIV_8);
+    }
+    // Setup scale and odr values for gyro
+    busWrite(dev, ICM456XX_GYRO_CONFIG0, ICM456XX_GYRO_FS_SEL_2000DPS | config->gyroConfigValues[1]);
+    // Per datasheet Table 9-6: 35ms minimum startup time
+    delay(ICM456XX_GYRO_STARTUP_TIME_MS);
+    
     busWrite(dev, ICM456XX_INT1_CONFIG2, ICM456XX_INT1_MODE_PULSED | ICM456XX_INT1_DRIVE_CIRCUIT_PP |
                                             ICM456XX_INT1_POLARITY_ACTIVE_HIGH);
     busWrite(dev, ICM456XX_INT1_CONFIG0, ICM456XX_INT1_STATUS_EN_DRDY);
-    // accel init
-    icm45686WriteIREG(dev, ICM456XX_ACCEL_SRC_CTRL_IREG_ADDR, ICM456XX_SRC_CTRL_AAF_ENABLE_BIT | ICM456XX_SRC_CTRL_INTERP_ENABLE_BIT);
-    icm45686WriteIREG(dev, ICM456XX_ACCEL_UI_LPF_CFG_IREG_ADDR, ICM456XX_ACCEL_UI_LPFBW_ODR_DIV_8);
+
     delay(15);
     busSetSpeed(dev, BUS_SPEED_FAST);
 }
