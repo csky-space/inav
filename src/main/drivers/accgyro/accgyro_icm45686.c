@@ -303,7 +303,6 @@ static bool icm45686WriteIREG(const busDevice_t *dev, uint16_t reg, uint8_t valu
         uint8_t misc2 = 0;
         busRead(dev, ICM456XX_REG_MISC2, &misc2);
         if (misc2 & ICM456XX_BIT_IREG_DONE) {
-            LOG_DEBUG(GYRO, "Gyro icm45686WriteIREG OK");
             return true;
         }
         delay(1);
@@ -315,7 +314,6 @@ static bool icm45686WriteIREG(const busDevice_t *dev, uint16_t reg, uint8_t valu
 static void icm45686AccInit(accDev_t *acc)
 {
     acc->acc_1G = 512 * 4; // 16g scale
-    LOG_DEBUG(GYRO, "Gyaro acc init start");
 }
 
 static bool icm45686AccRead(accDev_t *acc)
@@ -327,9 +325,9 @@ static bool icm45686AccRead(accDev_t *acc)
         return false;
     }
 
-    acc->ADCRaw[X] = (float) int16_val_big_endian(data, 0);
-    acc->ADCRaw[Y] = (float) int16_val_big_endian(data, 1);
-    acc->ADCRaw[Z] = (float) int16_val_big_endian(data, 2);
+    acc->ADCRaw[X] = (float) int16_val_little_endian(data, 0);
+    acc->ADCRaw[Y] = (float) int16_val_little_endian(data, 1);
+    acc->ADCRaw[Z] = (float) int16_val_little_endian(data, 2);
 
     return true;
 }
@@ -343,15 +341,9 @@ static bool icm45686GyroRead(gyroDev_t *gyro)
         return false;
     }
 
-    gyro->gyroADCRaw[X] = (float) int16_val_big_endian(data, 0) / 1024;
-    gyro->gyroADCRaw[Y] = (float) int16_val_big_endian(data, 1) / 1024;
-    gyro->gyroADCRaw[Z] = (float) int16_val_big_endian(data, 2) / 1024;
-
-    static bool isDataSended = false;
-    if (!isDataSended) {
-        LOG_DEBUG(GYRO, "Gyro data:%d %d %d", int16_val_big_endian(data, 0), int16_val_big_endian(data, 1), int16_val_big_endian(data, 2));
-        isDataSended = true;
-    }
+    gyro->gyroADCRaw[X] = (float) int16_val_little_endian(data, 0);
+    gyro->gyroADCRaw[Y] = (float) int16_val_little_endian(data, 1);
+    gyro->gyroADCRaw[Z] = (float) int16_val_little_endian(data, 2);
 
     return true;
 }
@@ -365,14 +357,13 @@ static bool icm45686ReadTemperature(gyroDev_t *gyro, int16_t * temp)
         return false;
     }
     // From datasheet: Temperature in Degrees Centigrade = (TEMP_DATA / 128) + 25 
-    *temp = ( int16_val_big_endian(data, 0) / 12.8 ) + 250; // Temperature stored as degC*10
+    *temp = ( int16_val_little_endian(data, 0) / 12.8 ) + 250; // Temperature stored as degC*10
 
     return true;
 }
 
 static void icm45686AccAndGyroInit(gyroDev_t *gyro)
 {
-    LOG_DEBUG(GYRO, "Gyro init start");
     busDevice_t * dev = gyro->busDev;
     const gyroFilterAndRateConfig_t * config = chooseGyroConfig(gyro->lpf, 1000000 / gyro->requestedSampleIntervalUs,
                                                                 &icm45xxGyroConfigs[0], ARRAYLEN(icm45xxGyroConfigs));
@@ -380,23 +371,23 @@ static void icm45686AccAndGyroInit(gyroDev_t *gyro)
         
     busSetSpeed(dev, BUS_SPEED_INITIALIZATION);
 	
-	
     // enable sensors
     busWrite(dev, ICM456XX_PWR_MGMT0, (ICM456XX_GYRO_MODE_LN | ICM456XX_ACCEL_MODE_LN));
     delay(ICM456XX_SENSOR_ENABLE_DELAY_MS); // Allow sensors to power on and stabilize
+    
     busWrite(dev, ICM456XX_ACCEL_CONFIG0, ICM456XX_ACCEL_FS_SEL_16G | ICM456XX_ACCEL_ODR_1K6_LN);
     delay(ICM456XX_ACCEL_STARTUP_TIME_MS);
-    icm45686WriteIREG(dev, ICM456XX_GYRO_SRC_CTRL_IREG_ADDR, 0); // ICM456XX_SRC_CTRL_AAF_ENABLE_BIT | ICM456XX_SRC_CTRL_INTERP_ENABLE_BIT
-    icm45686WriteIREG(dev, ICM456XX_GYRO_UI_LPF_CFG_IREG_ADDR, ICM456XX_GYRO_UI_LPFBW_BYPASS);
+
+    icm45686WriteIREG(dev, ICM456XX_GYRO_SRC_CTRL_IREG_ADDR, ICM456XX_SRC_CTRL_AAF_ENABLE_BIT | ICM456XX_SRC_CTRL_INTERP_ENABLE_BIT);
+    icm45686WriteIREG(dev, ICM456XX_GYRO_UI_LPF_CFG_IREG_ADDR, ICM456XX_GYRO_UI_LPFBW_ODR_DIV_8);
     busWrite(dev, ICM456XX_GYRO_CONFIG0, ICM456XX_GYRO_FS_SEL_2000DPS | ICM456XX_GYRO_ODR_6K4_LN);
     delay(ICM456XX_GYRO_STARTUP_TIME_MS); // Per datasheet Table 9-6: 35ms minimum startup time
     busWrite(dev, ICM456XX_INT1_CONFIG2, ICM456XX_INT1_MODE_PULSED | ICM456XX_INT1_DRIVE_CIRCUIT_PP |
                                             ICM456XX_INT1_POLARITY_ACTIVE_HIGH);
-
     busWrite(dev, ICM456XX_INT1_CONFIG0, ICM456XX_INT1_STATUS_EN_DRDY);
     // accel init
-    icm45686WriteIREG(dev, ICM456XX_ACCEL_SRC_CTRL_IREG_ADDR, 0); // ICM456XX_SRC_CTRL_AAF_ENABLE_BIT | ICM456XX_SRC_CTRL_INTERP_ENABLE_BIT
-    icm45686WriteIREG(dev, ICM456XX_ACCEL_UI_LPF_CFG_IREG_ADDR, ICM456XX_ACCEL_UI_LPFBW_BYPASS);
+    icm45686WriteIREG(dev, ICM456XX_ACCEL_SRC_CTRL_IREG_ADDR, ICM456XX_SRC_CTRL_AAF_ENABLE_BIT | ICM456XX_SRC_CTRL_INTERP_ENABLE_BIT);
+    icm45686WriteIREG(dev, ICM456XX_ACCEL_UI_LPF_CFG_IREG_ADDR, ICM456XX_ACCEL_UI_LPFBW_ODR_DIV_8);
     delay(15);
     busSetSpeed(dev, BUS_SPEED_FAST);
 }
@@ -406,7 +397,7 @@ static bool icm45686DeviceDetect(busDevice_t * dev)
     uint8_t tmp = 0xFF;
     uint8_t attemptsRemaining = 5;
     uint32_t waitedMs = 0;
-    LOG_DEBUG(GYRO, "Gyro detection");
+
     busSetSpeed(dev, BUS_SPEED_INITIALIZATION);
     // ICM-45686 does not use bank switching (register 0x75 is reserved)
     // Perform soft reset directly
@@ -416,13 +407,11 @@ static bool icm45686DeviceDetect(busDevice_t * dev)
     while (1) {
         busRead(dev, ICM456XX_REG_MISC2, &tmp);
         if (!(tmp & ICM456XX_SOFT_RESET)) {
-            LOG_DEBUG(GYRO, "Gyro detect reset OK");
             break;
         }
         delay(1);
         waitedMs++;
         if (waitedMs >= 20) {
-            LOG_DEBUG(GYRO, "Gyro fail reset timeout");
             return false;
         }
     }
@@ -434,7 +423,6 @@ static bool icm45686DeviceDetect(busDevice_t * dev)
         delay(150);
         busRead(dev, ICM456XX_WHO_AM_REGISTER, &tmp);
         if (tmp == ICM45686_WHO_AM_I_CONST) {
-            LOG_DEBUG(GYRO, "Gyro detect WHO AM I OK");
             return true;
         }
     } while (attemptsRemaining--);
@@ -463,15 +451,12 @@ bool icm45686AccDetect(accDev_t *acc)
 
 bool icm45686GyroDetect(gyroDev_t *gyro)
 {
-    LOG_DEBUG(GYRO, "Gyro detection start");
     gyro->busDev = busDeviceInit(BUSTYPE_ANY, DEVHW_ICM45686, gyro->imuSensorToUse, OWNER_MPU);
     if (gyro->busDev == NULL) {
-        LOG_DEBUG(GYRO, "Gyro fail, busdev not found");
         return false;
     }
 
     if (!icm45686DeviceDetect(gyro->busDev)) {
-        LOG_DEBUG(GYRO, "Gyro detect fail");
         busDeviceDeInit(gyro->busDev);
         return false;
     }
