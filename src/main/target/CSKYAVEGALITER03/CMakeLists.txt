@@ -1,0 +1,1 @@
+target_stm32f427xg(CSKYAVEGALITER03 HSE_MHZ 8)
