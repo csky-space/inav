@@ -38,6 +38,11 @@
 #define USE_BARO
 #define BARO_I2C_BUS            BUS_I2C2
 #define USE_BARO_BMP388
+#define BMP388_I2C_ADDR         0x77
+
+#define USE_MAG
+#define USE_MAG_ALL
+#define MAG_I2C_BUS             BUS_I2C2
 
 //UARTS-------------------------------------
 #define USE_VCP
@@ -110,7 +115,6 @@
 
 #define USE_I2C
 #define USE_I2C_DEVICE_2
-#define USE_I2C_PULLUP
 #define I2C2_SCL                PF1
 #define I2C2_SDA                PF0
 
