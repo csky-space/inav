@@ -96,6 +96,10 @@
 /*
  * Sensor drivers
  */
+#define USE_IMU_ICM42605 // ICM42688P
+#define ICM42605_CS_PIN         PA4
+#define ICM42605_SPI_BUS        BUS_SPI1
+#define IMU_ICM42605_ALIGN      CW180_DEG
 //ICM-45686
 #define USE_IMU_ICM45686
 #define IMU_ICM45686_ALIGN      CW180_DEG
